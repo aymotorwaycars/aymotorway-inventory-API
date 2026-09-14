@@ -10,7 +10,7 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/inventory") {
 
-    fs.readFile("./INVENTORY.JSON", "utf8", (err, data) => {
+    fs.readFile("./inventory.json", "utf8", (err, data) => {
 
       if (err) {
 
