@@ -20,9 +20,17 @@ const server = http.createServer((req, res) => {
 
         console.error("Inventory error:", err);
 
+        console.error("Files in app:", fs.readdirSync(__dirname));
+
         res.writeHead(500, { "Content-Type": "application/json" });
 
-        res.end(JSON.stringify({ error: "Unable to load inventory" }));
+        res.end(JSON.stringify({
+
+          error: "Unable to load inventory",
+
+          files: fs.readdirSync(__dirname)
+
+        }));
 
         return;
 
