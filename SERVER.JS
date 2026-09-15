@@ -2,6 +2,8 @@ const http = require("http");
 
 const fs = require("fs");
 
+const path = require("path");
+
 const port = process.env.PORT || 3000;
 
 const server = http.createServer((req, res) => {
@@ -10,19 +12,23 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/inventory") {
 
-    fs.readFile("./inventory.json", "utf8", (err, data) => {
+    const inventoryPath = path.join(__dirname, "inventory.json");
+
+    fs.readFile(inventoryPath, "utf8", (err, data) => {
 
       if (err) {
 
-        res.writeHead(500, {"Content-Type": "application/json"});
+        console.error("Inventory error:", err);
 
-        res.end(JSON.stringify({error: "Unable to load inventory"}));
+        res.writeHead(500, { "Content-Type": "application/json" });
+
+        res.end(JSON.stringify({ error: "Unable to load inventory" }));
 
         return;
 
       }
 
-      res.writeHead(200, {"Content-Type": "application/json"});
+      res.writeHead(200, { "Content-Type": "application/json" });
 
       res.end(data);
 
@@ -32,7 +38,7 @@ const server = http.createServer((req, res) => {
 
   }
 
-  res.writeHead(200, {"Content-Type": "text/plain"});
+  res.writeHead(200, { "Content-Type": "text/plain" });
 
   res.end("AY Motorway API is running");
 
