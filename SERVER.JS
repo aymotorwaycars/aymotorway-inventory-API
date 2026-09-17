@@ -14,7 +14,7 @@ function fetchPage(url) {
     }, (response) => {
       let data = "";
 
-      response.on("data", chunk => {
+      response.on("data", (chunk) => {
         data += chunk;
       });
 
@@ -29,13 +29,24 @@ function fetchPage(url) {
   });
 }
 
-function cleanText(value) {
+function decodeHtml(value) {
   return (value || "")
-    .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&#8211;/gi, "-")
+    .replace(/&#8212;/gi, "-")
     .replace(/&#038;/gi, "&")
     .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function cleanText(value) {
+  return decodeHtml(value)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -56,6 +67,8 @@ function extractVehicleLinks(html) {
       continue;
     }
 
+    url = url.replace("https://aymotorway.ca", "https://aymotorwayltd.gotgoodcars.com");
+
     if (!links.includes(url)) {
       links.push(url);
     }
@@ -64,81 +77,120 @@ function extractVehicleLinks(html) {
   return links;
 }
 
-function valueAfterLabel(text, label, nextLabels) {
-  const start = text.toLowerCase().indexOf(label.toLowerCase());
+function getMeta(html, property) {
+  const patterns = [
+    new RegExp('<meta[^>]+property=["\']' + property + '["\'][^>]+content=["\']([^"\']*)["\']', "i"),
+    new RegExp('<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']' + property + '["\']', "i")
+  ];
 
-  if (start === -1) {
-    return "";
-  }
-
-  const valueStart = start + label.length;
-  let end = text.length;
-
-  for (const nextLabel of nextLabels) {
-    const position = text.toLowerCase().indexOf(
-      nextLabel.toLowerCase(),
-      valueStart
-    );
-
-    if (position !== -1 && position < end) {
-      end = position;
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) {
+      return cleanText(match[1]);
     }
   }
 
-  return text.substring(valueStart, end).trim();
+  return "";
+}
+
+function getTitle(html) {
+  const h1 = html.match(/<h1[^>]>([\s\S]?)<\/h1>/i);
+
+  if (h1) {
+    return cleanText(h1[1]);
+  }
+
+  const ogTitle = getMeta(html, "og:title");
+
+  if (ogTitle) {
+    return ogTitle;
+  }
+
+  const title = html.match(/<title[^>]>([\s\S]?)<\/title>/i);
+
+  return title ? cleanText(title[1]) : "";
+}
+
+function findValue(text, labels) {
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const patterns = [
+      new RegExp(escaped + "\\s*[:#-]?\\s*([^|]{1,100}?)(?=\\s+(?:Mileage|Kilometers|Kilometres|Odometer|Trim|Engine|Transmission|Drive Type|Drivetrain|Stock|Exterior|Interior|Fuel Type|VIN|Title|Status)\\b|$)", "i"),
+      new RegExp(escaped + "\\s*[:#-]?\\s*([^\\n\\r|]{1,100})", "i")
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+  }
+
+  return "";
+}
+
+function findPrice(text, html) {
+  const patterns = [
+    /\$\s*[\d,]+(?:\.\d{2})?/,
+    /CA\$\s*[\d,]+(?:\.\d{2})?/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+
+    if (match) {
+      return match[0];
+    }
+  }
+
+  const metaPrice =
+    getMeta(html, "product:price:amount") ||
+    getMeta(html, "og:price:amount");
+
+  return metaPrice ? "$" + metaPrice : "";
 }
 
 function parseVehicle(html, url) {
   const text = cleanText(html);
 
-  const titleMatch = html.match(/<h1[^>]>([\s\S]?)<\/h1>/i);
-  const priceMatch = text.match(/\$[\d,]+/);
-
-  const labels = [
-    "Mileage",
-    "Trim",
-    "ENGINE",
-    "Transmission",
-    "Drive Type",
-    "Stock #",
-    "Exterior Color",
-    "Interior Color",
-    "Fuel Type",
-    "Title",
-    "Description"
-  ];
-
   return {
-    name: titleMatch ? cleanText(titleMatch[1]) : "",
-    price: priceMatch ? priceMatch[0] : "",
-    mileage: valueAfterLabel(text, "Mileage", labels.slice(1)),
-    trim: valueAfterLabel(text, "Trim", labels.slice(2)),
-    engine: valueAfterLabel(text, "ENGINE", labels.slice(3)),
-    transmission: valueAfterLabel(text, "Transmission", labels.slice(4)),
-    driveType: valueAfterLabel(text, "Drive Type", labels.slice(5)),
-    stockNumber: valueAfterLabel(text, "Stock #", labels.slice(6)),
-    exteriorColor: valueAfterLabel(text, "Exterior Color", labels.slice(7)),
-    interiorColor: valueAfterLabel(text, "Interior Color", labels.slice(8)),
-    fuelType: valueAfterLabel(text, "Fuel Type", labels.slice(9)),
-    titleStatus: valueAfterLabel(text, "Title", ["Description", "CITY", "HWY"]),
-    url: url
+    name: getTitle(html),
+    price: findPrice(text, html),
+    mileage: findValue(text, ["Mileage", "Kilometers", "Kilometres", "Odometer"]),
+    trim: findValue(text, ["Trim"]),
+    engine: findValue(text, ["Engine"]),
+    transmission: findValue(text, ["Transmission"]),
+    driveType: findValue(text, ["Drive Type", "Drivetrain"]),
+    stockNumber: findValue(text, ["Stock #", "Stock Number", "Stock"]),
+    exteriorColor: findValue(text, ["Exterior Color", "Exterior Colour"]),
+    interiorColor: findValue(text, ["Interior Color", "Interior Colour"]),
+    fuelType: findValue(text, ["Fuel Type", "Fuel"]),
+    titleStatus: findValue(text, ["Title Status", "Title", "Status"]),
+    url: url.replace(
+      "https://aymotorwayltd.gotgoodcars.com",
+      "https://aymotorway.ca"
+    )
   };
 }
 
 async function getInventory() {
   const inventoryHtml = await fetchPage(INVENTORY_URL);
   const links = extractVehicleLinks(inventoryHtml);
-
   const vehicles = [];
 
   for (const url of links) {
     try {
       const html = await fetchPage(url);
-      const vehicle = parseVehicle(html, url);
-      vehicles.push(vehicle);
+      vehicles.push(parseVehicle(html, url));
     } catch (error) {
       vehicles.push({
-        url: url,
+        url: url.replace(
+          "https://aymotorwayltd.gotgoodcars.com",
+          "https://aymotorway.ca"
+        ),
         error: error.message
       });
     }
@@ -155,7 +207,7 @@ const server = http.createServer(async (req, res) => {
       const vehicles = await getInventory();
 
       res.writeHead(200, {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
       });
 
       res.end(JSON.stringify({
@@ -167,7 +219,7 @@ const server = http.createServer(async (req, res) => {
 
     } catch (error) {
       res.writeHead(500, {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
       });
 
       res.end(JSON.stringify({
@@ -180,7 +232,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   res.writeHead(200, {
-    "Content-Type": "text/plain"
+    "Content-Type": "text/plain; charset=utf-8"
   });
 
   res.end("AY Motorway API is running");
