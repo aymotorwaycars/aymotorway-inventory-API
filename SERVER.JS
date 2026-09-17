@@ -23,7 +23,7 @@ function fetchInventoryPage() {
         if (response.statusCode >= 200 && response.statusCode < 400) {
           resolve(data);
         } else {
-          reject(new Error(Inventory request failed: ${response.statusCode}));
+reject(new Error(Inventory request failed: ${response.statusCode}));
         }
       });
     }).on("error", reject);
