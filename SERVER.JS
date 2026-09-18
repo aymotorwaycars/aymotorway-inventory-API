@@ -217,6 +217,7 @@ async function getInventory() {
     }
 
     if (newLinks === 0) break;
+if (page >= 4) break;
   }
 
   return vehicles;
