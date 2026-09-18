@@ -12,14 +12,20 @@ function fetchPage(url) {
         "Accept": "text/html"
       }
     }, (response) => {
-      let data = "";
+if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+const redirectUrl = new URL(response.headers.location, url).toString();
+response.resume();
+fetchPage(redirectUrl).then(resolve).catch(reject);
+return;
+}
+let data = "";
 
       response.on("data", (chunk) => {
         data += chunk;
       });
 
       response.on("end", () => {
-        if (response.statusCode >= 200 && response.statusCode < 400) {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
           resolve(data);
         } else {
           reject(new Error("Request failed: " + response.statusCode));
