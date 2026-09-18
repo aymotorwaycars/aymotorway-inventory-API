@@ -177,23 +177,47 @@ function parseVehicle(html, url) {
 }
 
 async function getInventory() {
-  const inventoryHtml = await fetchPage(INVENTORY_URL);
-  const links = extractVehicleLinks(inventoryHtml);
   const vehicles = [];
+  const seen = new Set();
 
-  for (const url of links) {
+  for (let page = 1; page <= 20; page++) {
+    const pageUrl =
+      page === 1
+        ? INVENTORY_URL
+        : INVENTORY_URL + "?page=" + page;
+
+    let inventoryHtml;
+
     try {
-      const html = await fetchPage(url);
-      vehicles.push(parseVehicle(html, url));
+      inventoryHtml = await fetchPage(pageUrl);
     } catch (error) {
-      vehicles.push({
-        url: url.replace(
-          "https://aymotorwayltd.gotgoodcars.com",
-          "https://aymotorway.ca"
-        ),
-        error: error.message
-      });
+      break;
     }
+
+    const links = extractVehicleLinks(inventoryHtml);
+    let newLinks = 0;
+
+    for (const url of links) {
+      if (seen.has(url)) continue;
+
+      seen.add(url);
+      newLinks++;
+
+      try {
+        const html = await fetchPage(url);
+        vehicles.push(parseVehicle(html, url));
+      } catch (error) {
+        vehicles.push({
+          url: url.replace(
+            "https://aymotorwayltd.gotgoodcars.com",
+            "https://aymotorway.ca"
+          ),
+          error: error.message
+        });
+      }
+    }
+
+    if (newLinks === 0) break;
   }
 
   return vehicles;
