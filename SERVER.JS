@@ -182,8 +182,8 @@ function parseVehicle(html, url) {
 }
 
 async function getInventory() {
-  const vehicles = [];
   const seen = new Set();
+  const allLinks = [];
 
   for (let page = 1; page <= 20; page++) {
     const pageUrl =
@@ -206,29 +206,32 @@ async function getInventory() {
       if (seen.has(url)) continue;
 
       seen.add(url);
+      allLinks.push(url);
       newLinks++;
+    }
 
+    if (newLinks === 0) break;
+  }
+
+  const vehicles = await Promise.all(
+    allLinks.map(async (url) => {
       try {
         const html = await fetchPage(url);
-        vehicles.push(parseVehicle(html, url));
+        return parseVehicle(html, url);
       } catch (error) {
-        vehicles.push({
+        return {
           url: url.replace(
             "https://aymotorwayltd.gotgoodcars.com",
             "https://aymotorway.ca"
           ),
           error: error.message
-        });
+        };
       }
-    }
-
-    if (newLinks === 0) break;
-
-  }
+    })
+  );
 
   return vehicles;
 }
-
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
