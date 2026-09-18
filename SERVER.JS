@@ -52,8 +52,8 @@ function cleanText(value) {
 }
 
 function extractVehicleLinks(html) {
-  const links = [];
-  const regex = /href=["']([^"']*\/vehicles\/[^"'?#]+\/?)["']/gi;
+const links = [];
+  const regex = /href=["']([^"']*\/vehicles\/[^"']+)["']/gi;
   let match;
 
   while ((match = regex.exec(html)) !== null) {
@@ -63,11 +63,10 @@ function extractVehicleLinks(html) {
       url = "https://aymotorwayltd.gotgoodcars.com" + url;
     }
 
-    if (!url.startsWith("http")) {
-      continue;
-    }
-
-    url = url.replace("https://aymotorway.ca", "https://aymotorwayltd.gotgoodcars.com");
+    url = url.replace(
+      "https://aymotorway.ca",
+      "https://aymotorwayltd.gotgoodcars.com"
+    );
 
     if (!links.includes(url)) {
       links.push(url);
