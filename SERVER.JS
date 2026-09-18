@@ -184,7 +184,7 @@ async function getInventory() {
     const pageUrl =
       page === 1
         ? INVENTORY_URL
-        : INVENTORY_URL + "?page=" + page;
+        : INVENTORY_URL + "?paged=" + page;
 
     let inventoryHtml;
 
