@@ -181,7 +181,13 @@ function parseVehicle(html, url) {
   };
 }
 
+let inventoryCache = null;
+let inventoryCacheTime = 0;
+
 async function getInventory() {
+if (inventoryCache && Date.now() - inventoryCacheTime < 300000) {
+  return inventoryCache;
+}
   const seen = new Set();
   const allLinks = [];
 
@@ -230,7 +236,10 @@ async function getInventory() {
     })
   );
 
-  return vehicles;
+ 
+inventoryCache = vehicles;
+inventoryCacheTime = Date.now();
+return vehicles;
 }
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
